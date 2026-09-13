@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Autonomous Line Follower - Complete Master Schematic</title>
+<style>
+  :root {
+    --bg-main: #0a0f1d;
+    --bg-card: #131c2e;
+    --border: #26354f;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --accent: #38bdf8;
+    --pwr-7v: #ef4444;
+    --pwr-5v: #f97316;
+    --pwr-3v3: #eab308;
+    --gnd: #64748b;
+    --sig-pwm: #c084fc;
+    --sig-pcnt: #06b6d4;
+    --sig-adc: #10b981;
+    --sig-led: #f43f5e;
+    --mot-pwr: #fb923c;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace, sans-serif;
+    background: var(--bg-main);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--bg-card);
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .title { font-size: 1.05rem; font-weight: 700; color: var(--accent); }
+  .badge { background: #0284c7; font-size: 0.72rem; padding: 3px 8px; border-radius: 4px; font-weight: 600; }
+  .active-net-pill {
+    background: #1e293b;
+    border: 1px solid var(--border);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-family: monospace;
+    display: none;
+  }
+  .controls { display: flex; gap: 8px; }
+  .btn {
+    background: #1e293b;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 5px 12px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn:hover { background: #334155; border-color: var(--accent); }
+
+  .workspace { display: flex; flex: 1; overflow: hidden; }
+
+  .viewport {
+    flex: 3.2;
+    overflow: auto;
+    position: relative;
+    background-image: radial-gradient(#1e293b 1px, transparent 1px);
+    background-size: 20px 20px;
+    padding: 24px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  svg {
+    background: #0d1527;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+  }
+
+  .sidebar {
+    flex: 1.8;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: #0b1120; }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .tab-btn.active { color: var(--accent); border-bottom: 2px solid var(--accent); background: var(--bg-card); }
+
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+  th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { background: #0b1120; color: var(--text-muted); position: sticky; top: 0; z-index: 10; font-size: 0.72rem; }
+  tr { transition: background 0.15s; }
+  tr:hover { background: rgba(56, 189, 248, 0.1); cursor: pointer; }
+  .net-tag {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+
+  /* SVG Specific Styles */
+  .module-box { fill: #111a2e; stroke: #334155; stroke-width: 1.5; rx: 6; }
+  .module-header { fill: #1a263e; }
+  .header-text { fill: #38bdf8; font-size: 11.5px; font-weight: 700; font-family: sans-serif; }
+  .pin-text { fill: #94a3b8; font-size: 9.5px; font-family: monospace; }
+  
+  .pin-circle {
+    cursor: pointer;
+    transition: transform 0.15s ease, fill 0.15s ease;
+  }
+  .pin-circle:hover { transform: scale(1.5); }
+
+  .wire {
+    fill: none;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.85;
+    transition: stroke-width 0.2s, opacity 0.2s, stroke 0.2s;
+  }
+
+  /* Highlighting Engine */
+  .highlight-active .wire { opacity: 0.08 !important; }
+  .highlight-active .pin-circle { opacity: 0.15 !important; }
+  .highlight-active .wire.selected-net {
+    opacity: 1 !important;
+    stroke: #ffffff !important;
+    stroke-width: 4.5 !important;
+    filter: drop-shadow(0 0 6px var(--accent));
+  }
+  .highlight-active .pin-circle.selected-net {
+    opacity: 1 !important;
+    fill: #ffffff !important;
+    stroke: var(--accent) !important;
+    stroke-width: 2px !important;
+  }
+
+  .search-box {
+    width: 100%;
+    padding: 7px 10px;
+    background: #0b1120;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.78rem;
+  }
+  .search-box:focus { outline: 1px solid var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1 class="title">Autonomous Robot Schematic Visualizer</h1>
+    <span class="badge">ESP32-S3 MASTER SCHEMATIC</span>
+    <div id="activePill" class="active-net-pill">ACTIVE: <span id="activeNetName">NONE</span></div>
+  </div>
+  <div class="controls">
+    <button class="btn" onclick="zoom(0.1)">Zoom In (+)</button>
+    <button class="btn" onclick="zoom(-0.1)">Zoom Out (-)</button>
+    <button class="btn" onclick="resetZoom()">100%</button>
+    <button class="btn" onclick="clearHighlight()">Clear Highlight</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <div class="viewport" id="viewport">
+    <svg id="schematicSvg" width="1540" height="980" viewBox="0 0 1540 980">
+      
+      <!-- ================= BUS CORRIDORS ================= -->
+      <!-- Ground Bus -->
+      <path d="M 170 120 L 170 925 L 1480 925 L 1480 300" class="wire" data-net="GND" stroke="var(--gnd)" stroke-dasharray="4,4"/>
+      <!-- 3.3V Logic Bus -->
+      <path d="M 520 240 L 470 240 L 470 895 L 1440 895 L 1440 270 L 1100 270" class="wire" data-net="3V3" stroke="var(--pwr-3v3)"/>
+
+      <!-- ================= 1. POWER SUBSYSTEM (TOP) ================= -->
+      <!-- XT60 Battery -->
+      <g id="box-xt60">
+        <rect x="40" y="40" width="140" height="75" class="module-box"/>
+        <path d="M40 40 h140 v22 h-140 z" class="module-header"/>
+        <text x="50" y="56" class="header-text">XT60 (2S LiPo)</text>
+        <circle cx="170" cy="75" r="4.5" class="pin-circle" data-net="VBAT_RAW" fill="var(--pwr-7v)"/>
+        <circle cx="170" cy="98" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="50" y="78" class="pin-text">+ VBAT (7.4V)</text>
+        <text x="50" y="101" class="pin-text">- GND</text>
+      </g>
+
+      <!-- DPDT Switch (Fixed labels: stacked vertically to prevent overlap) -->
+      <g id="box-switch">
+        <rect x="230" y="40" width="150" height="75" class="module-box"/>
+        <path d="M230 40 h150 v22 h-150 z" class="module-header"/>
+        <text x="240" y="56" class="header-text">DPDT SWITCH</text>
+        <circle cx="240" cy="75" r="4.5" class="pin-circle" data-net="VBAT_RAW" fill="var(--pwr-7v)"/>
+        <circle cx="370" cy="75" r="4.5" class="pin-circle" data-net="VBAT_SW" fill="var(--pwr-7v)"/>
+        <text x="252" y="75" class="pin-text">IN (Pin 1)</text>
+        <text x="252" y="95" class="pin-text">OUT (Pin 2) &rarr;</text>
+      </g>
+
+      <!-- MP1584 Buck Converter -->
+      <g id="box-buck">
+        <rect x="440" y="30" width="190" height="95" class="module-box"/>
+        <path d="M440 30 h190 v22 h-190 z" class="module-header"/>
+        <text x="450" y="46" class="header-text">MP1584 BUCK (5V)</text>
+        <circle cx="450" cy="68" r="4.5" class="pin-circle" data-net="VBAT_SW" fill="var(--pwr-7v)"/>
+        <circle cx="450" cy="98" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <circle cx="620" cy="68" r="4.5" class="pin-circle" data-net="5V" fill="var(--pwr-5v)"/>
+        <circle cx="620" cy="98" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="460" y="71" class="pin-text">IN+ (7.4V)</text>
+        <text x="460" y="101" class="pin-text">IN- (GND)</text>
+        <text x="545" y="71" class="pin-text">OUT+ (5V)</text>
+        <text x="545" y="101" class="pin-text">OUT- (GND)</text>
+      </g>
+
+      <!-- 100uF Bulk Cap -->
+      <g id="box-cap">
+        <rect x="250" y="145" width="130" height="50" class="module-box" stroke-dasharray="3,3"/>
+        <text x="260" y="162" class="header-text" fill="#eab308" style="font-size:10px;">100uF BULK CAP</text>
+        <circle cx="260" cy="180" r="4.5" class="pin-circle" data-net="VBAT_SW" fill="var(--pwr-7v)"/>
+        <circle cx="370" cy="180" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="272" y="183" class="pin-text">+ VM</text>
+        <text x="330" y="183" class="pin-text">- GND</text>
+      </g>
+
+      <!-- ================= 2. MOTOR DRIVER (LEFT) ================= -->
+      <!-- Expanded width to 340px and anchored labels to permanently eliminate collision -->
+      <g id="box-drv8833">
+        <rect x="40" y="230" width="340" height="340" class="module-box"/>
+        <path d="M40 230 h340 v24 h-340 z" class="module-header"/>
+        <text x="50" y="247" class="header-text">DRV8833 MODULE (2x6)</text>
+        
+        <!-- Left Side Pins (Start-aligned text) -->
+        <circle cx="50" cy="275" r="4.5" class="pin-circle" data-net="VBAT_SW" fill="var(--pwr-7v)"/>
+        <text x="62" y="278" class="pin-text" text-anchor="start">VM (7.4V)</text>
+
+        <circle cx="50" cy="305" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="62" y="308" class="pin-text" text-anchor="start">GND</text>
+
+        <circle cx="50" cy="335" r="4.5" class="pin-circle" data-net="3V3" fill="var(--pwr-3v3)"/>
+        <text x="62" y="338" class="pin-text" text-anchor="start">nSLEEP (3.3V)</text>
+
+        <circle cx="50" cy="365" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+        <text x="62" y="368" class="pin-text" text-anchor="start">FAULT (NC)</text>
+
+        <!-- Right Side Pins (End-aligned text with clearance to prevent collision) -->
+        <circle cx="370" cy="275" r="4.5" class="pin-circle" data-net="M_L_IN1" fill="var(--sig-pwm)"/>
+        <text x="358" y="278" class="pin-text" text-anchor="end">IN1 (L FWD)</text>
+
+        <circle cx="370" cy="305" r="4.5" class="pin-circle" data-net="M_L_IN2" fill="var(--sig-pwm)"/>
+        <text x="358" y="308" class="pin-text" text-anchor="end">IN2 (L REV)</text>
+
+        <circle cx="370" cy="335" r="4.5" class="pin-circle" data-net="M_R_IN3" fill="var(--sig-pwm)"/>
+        <text x="358" y="338" class="pin-text" text-anchor="end">IN3 (R FWD)</text>
+
+        <circle cx="370" cy="365" r="4.5" class="pin-circle" data-net="M_R_IN4" fill="var(--sig-pwm)"/>
+        <text x="358" y="368" class="pin-text" text-anchor="end">IN4 (R REV)</text>
+
+        <!-- Motor Output Pins (Bottom) -->
+        <circle cx="50" cy="435" r="4.5" class="pin-circle" data-net="MOT_L_P" fill="var(--mot-pwr)"/>
+        <text x="62" y="438" class="pin-text" text-anchor="start">OUT1 &rarr; Motor L +</text>
+
+        <circle cx="50" cy="465" r="4.5" class="pin-circle" data-net="MOT_L_N" fill="var(--mot-pwr)"/>
+        <text x="62" y="468" class="pin-text" text-anchor="start">OUT2 &rarr; Motor L -</text>
+
+        <circle cx="50" cy="505" r="4.5" class="pin-circle" data-net="MOT_R_P" fill="var(--mot-pwr)"/>
+        <text x="62" y="508" class="pin-text" text-anchor="start">OUT3 &rarr; Motor R +</text>
+
+        <circle cx="50" cy="535" r="4.5" class="pin-circle" data-net="MOT_R_N" fill="var(--mot-pwr)"/>
+        <text x="62" y="538" class="pin-text" text-anchor="start">OUT4 &rarr; Motor R -</text>
+      </g>
+
+      <!-- Left Motor JST-XH -->
+      <g id="box-jst-left">
+        <rect x="40" y="605" width="340" height="135" class="module-box"/>
+        <path d="M40 605 h340 v20 h-340 z" class="module-header"/>
+        <text x="50" y="620" class="header-text" style="font-size:11px;">LEFT MOTOR + ENCODER (JST-XH 6P)</text>
+        
+        <!-- Left side: Motor power from DRV8833 -->
+        <circle cx="50" cy="635" r="4.5" class="pin-circle" data-net="MOT_L_P" fill="var(--mot-pwr)"/>
+        <text x="62" y="638" class="pin-text">1: Motor +</text>
+        <circle cx="50" cy="655" r="4.5" class="pin-circle" data-net="MOT_L_N" fill="var(--mot-pwr)"/>
+        <text x="62" y="658" class="pin-text">2: Motor -</text>
+
+        <!-- Right side: Encoder Signals -->
+        <circle cx="370" cy="675" r="4.5" class="pin-circle" data-net="3V3" fill="var(--pwr-3v3)"/>
+        <text x="358" y="678" class="pin-text" text-anchor="end">3: VCC (3.3V)</text>
+        <circle cx="370" cy="695" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="358" y="698" class="pin-text" text-anchor="end">4: GND</text>
+        <circle cx="370" cy="715" r="4.5" class="pin-circle" data-net="ENC_L_A" fill="var(--sig-pcnt)"/>
+        <text x="358" y="718" class="pin-text" text-anchor="end">5: Enc A &rarr; GPIO 17</text>
+        <circle cx="370" cy="735" r="4.5" class="pin-circle" data-net="ENC_L_B" fill="var(--sig-pcnt)"/>
+        <text x="358" y="738" class="pin-text" text-anchor="end">6: Enc B &rarr; GPIO 18</text>
+      </g>
+
+      <!-- Right Motor JST-XH -->
+      <g id="box-jst-right">
+        <rect x="40" y="760" width="340" height="135" class="module-box"/>
+        <path d="M40 760 h340 v20 h-340 z" class="module-header"/>
+        <text x="50" y="775" class="header-text" style="font-size:11px;">RIGHT MOTOR + ENCODER (JST-XH 6P)</text>
+        
+        <!-- Left side: Motor power from DRV8833 -->
+        <circle cx="50" cy="790" r="4.5" class="pin-circle" data-net="MOT_R_P" fill="var(--mot-pwr)"/>
+        <text x="62" y="793" class="pin-text">1: Motor +</text>
+        <circle cx="50" cy="810" r="4.5" class="pin-circle" data-net="MOT_R_N" fill="var(--mot-pwr)"/>
+        <text x="62" y="813" class="pin-text">2: Motor -</text>
+
+        <!-- Right side: Encoder Signals -->
+        <circle cx="370" cy="830" r="4.5" class="pin-circle" data-net="3V3" fill="var(--pwr-3v3)"/>
+        <text x="358" y="833" class="pin-text" text-anchor="end">3: VCC (3.3V)</text>
+        <circle cx="370" cy="850" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="358" y="853" class="pin-text" text-anchor="end">4: GND</text>
+        <circle cx="370" cy="870" r="4.5" class="pin-circle" data-net="ENC_R_A" fill="var(--sig-pcnt)"/>
+        <text x="358" y="873" class="pin-text" text-anchor="end">5: Enc A &rarr; GPIO 21</text>
+        <circle cx="370" cy="890" r="4.5" class="pin-circle" data-net="ENC_R_B" fill="var(--sig-pcnt)"/>
+        <text x="358" y="893" class="pin-text" text-anchor="end">6: Enc B &rarr; GPIO 38</text>
+      </g>
+
+      <!-- ================= 3. ESP32-S3 CORE (CENTER 44-PIN) ================= -->
+      <g id="box-esp32">
+        <rect x="520" y="190" width="460" height="715" class="module-box" style="stroke: #38bdf8; stroke-width: 2;"/>
+        <path d="M520 190 h460 v32 h-460 z" class="module-header" style="fill: #0369a1;"/>
+        <text x="640" y="212" class="header-text" fill="#ffffff" style="font-size:13px;">ESP32-S3-DevKitC-1 (44 PINS)</text>
+
+        <!-- LEFT PIN COLUMN (1 to 22) -->
+        <g id="esp-col-left">
+          <!-- 1 --> <circle cx="530" cy="240" r="4.5" class="pin-circle" data-net="3V3" fill="var(--pwr-3v3)"/>
+          <text x="542" y="244" class="pin-text">1: 3V3 (Logic Out)</text>
+          <!-- 2 --> <circle cx="530" cy="268" r="4.5" class="pin-circle" data-net="3V3" fill="var(--pwr-3v3)"/>
+          <text x="542" y="272" class="pin-text">2: 3V3 (Aux Rail)</text>
+          <!-- 3 --> <circle cx="530" cy="296" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="542" y="300" class="pin-text">3: EN (Reset)</text>
+          <!-- 4 --> <circle cx="530" cy="324" r="4.5" class="pin-circle" data-net="QTR_4" fill="var(--sig-adc)"/>
+          <text x="542" y="328" class="pin-text">4: GPIO 4 (ADC1_CH3 -> QTR 4)</text>
+          <!-- 5 --> <circle cx="530" cy="352" r="4.5" class="pin-circle" data-net="QTR_5" fill="var(--sig-adc)"/>
+          <text x="542" y="356" class="pin-text">5: GPIO 5 (ADC1_CH4 -> QTR 5)</text>
+          <!-- 6 --> <circle cx="530" cy="380" r="4.5" class="pin-circle" data-net="QTR_6" fill="var(--sig-adc)"/>
+          <text x="542" y="384" class="pin-text">6: GPIO 6 (ADC1_CH5 -> QTR 6)</text>
+          <!-- 7 --> <circle cx="530" cy="408" r="4.5" class="pin-circle" data-net="QTR_7" fill="var(--sig-adc)"/>
+          <text x="542" y="412" class="pin-text">7: GPIO 7 (ADC1_CH6 -> QTR 7)</text>
+          <!-- 8 --> <circle cx="530" cy="436" r="4.5" class="pin-circle" data-net="M_R_IN4" fill="var(--sig-pwm)"/>
+          <text x="542" y="440" class="pin-text">8: GPIO 15 (PWM -> R_REV / IN4)</text>
+          <!-- 9 --> <circle cx="530" cy="464" r="4.5" class="pin-circle" data-net="LED_STAT" fill="var(--sig-led)"/>
+          <text x="542" y="468" class="pin-text">9: GPIO 16 (Status LED)</text>
+          <!-- 10 --> <circle cx="530" cy="492" r="4.5" class="pin-circle" data-net="ENC_L_A" fill="var(--sig-pcnt)"/>
+          <text x="542" y="496" class="pin-text">10: GPIO 17 (PCNT0 -> Left Enc A)</text>
+          <!-- 11 --> <circle cx="530" cy="520" r="4.5" class="pin-circle" data-net="ENC_L_B" fill="var(--sig-pcnt)"/>
+          <text x="542" y="524" class="pin-text">11: GPIO 18 (PCNT0 -> Left Enc B)</text>
+          <!-- 12 --> <circle cx="530" cy="548" r="4.5" class="pin-circle" data-net="QTR_8" fill="var(--sig-adc)"/>
+          <text x="542" y="552" class="pin-text">12: GPIO 8 (ADC1_CH7 -> QTR 8)</text>
+          <!-- 13 --> <circle cx="530" cy="576" r="4.5" class="pin-circle" data-net="QTR_3" fill="var(--sig-adc)"/>
+          <text x="542" y="580" class="pin-text">13: GPIO 3 (ADC1_CH2 -> QTR 3)</text>
+          <!-- 14 --> <circle cx="530" cy="604" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="542" y="608" class="pin-text">14: GPIO 46 (Log / Boot Strap)</text>
+          <!-- 15 --> <circle cx="530" cy="632" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="542" y="636" class="pin-text">15: GPIO 9 (Free)</text>
+          <!-- 16 --> <circle cx="530" cy="660" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="542" y="664" class="pin-text">16: GPIO 10 (Free)</text>
+          <!-- 17 --> <circle cx="530" cy="688" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="542" y="692" class="pin-text">17: GPIO 11 (Free)</text>
+          <!-- 18 --> <circle cx="530" cy="716" r="4.5" class="pin-circle" data-net="M_L_IN1" fill="var(--sig-pwm)"/>
+          <text x="542" y="720" class="pin-text">18: GPIO 12 (PWM -> L_FWD / IN1)</text>
+          <!-- 19 --> <circle cx="530" cy="744" r="4.5" class="pin-circle" data-net="M_L_IN2" fill="var(--sig-pwm)"/>
+          <text x="542" y="748" class="pin-text">19: GPIO 13 (PWM -> L_REV / IN2)</text>
+          <!-- 20 --> <circle cx="530" cy="772" r="4.5" class="pin-circle" data-net="M_R_IN3" fill="var(--sig-pwm)"/>
+          <text x="542" y="776" class="pin-text">20: GPIO 14 (PWM -> R_FWD / IN3)</text>
+          <!-- 21 --> <circle cx="530" cy="800" r="4.5" class="pin-circle" data-net="5V" fill="var(--pwr-5v)"/>
+          <text x="542" y="804" class="pin-text" fill="var(--pwr-5v)">21: 5V (From MP1584 Buck)</text>
+          <!-- 22 --> <circle cx="530" cy="828" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+          <text x="542" y="832" class="pin-text">22: GND (Ground Plane)</text>
+        </g>
+
+        <!-- RIGHT PIN COLUMN (23 to 44) -->
+        <g id="esp-col-right">
+          <!-- 23 --> <circle cx="970" cy="240" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+          <text x="810" y="244" class="pin-text">GND (Ground Plane) :23</text>
+          <!-- 24 --> <circle cx="970" cy="268" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="820" y="272" class="pin-text">U0TXD (Debug TX) :24</text>
+          <!-- 25 --> <circle cx="970" cy="296" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="820" y="300" class="pin-text">U0RXD (Debug RX) :25</text>
+          <!-- 26 --> <circle cx="970" cy="324" r="4.5" class="pin-circle" data-net="QTR_1" fill="var(--sig-adc)"/>
+          <text x="760" y="328" class="pin-text">GPIO 1 (ADC1_0 -> QTR 1) :26</text>
+          <!-- 27 --> <circle cx="970" cy="352" r="4.5" class="pin-circle" data-net="QTR_2" fill="var(--sig-adc)"/>
+          <text x="760" y="356" class="pin-text">GPIO 2 (ADC1_1 -> QTR 2) :27</text>
+          <!-- 28 --> <circle cx="970" cy="380" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="835" y="384" class="pin-text">GPIO 42 (MTMS) :28</text>
+          <!-- 29 --> <circle cx="970" cy="408" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="835" y="412" class="pin-text">GPIO 41 (MTDI) :29</text>
+          <!-- 30 --> <circle cx="970" cy="436" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="835" y="440" class="pin-text">GPIO 40 (MTDO) :30</text>
+          <!-- 31 --> <circle cx="970" cy="464" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="835" y="468" class="pin-text">GPIO 39 (MTCK) :31</text>
+          <!-- 32 --> <circle cx="970" cy="492" r="4.5" class="pin-circle" data-net="ENC_R_B" fill="var(--sig-pcnt)"/>
+          <text x="770" y="496" class="pin-text">GPIO 38 (PCNT1 -> Enc R B) :32</text>
+          <!-- 33 --> <circle cx="970" cy="520" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="850" y="524" class="pin-text">GPIO 37 (Free) :33</text>
+          <!-- 34 --> <circle cx="970" cy="548" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="850" y="552" class="pin-text">GPIO 36 (Free) :34</text>
+          <!-- 35 --> <circle cx="970" cy="576" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="850" y="580" class="pin-text">GPIO 35 (Free) :35</text>
+          <!-- 36 --> <circle cx="970" cy="604" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="830" y="608" class="pin-text">GPIO 0 (Boot Btn) :36</text>
+          <!-- 37 --> <circle cx="970" cy="632" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="850" y="636" class="pin-text">GPIO 45 (Free) :37</text>
+          <!-- 38 --> <circle cx="970" cy="660" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="850" y="664" class="pin-text">GPIO 47 (Free) :38</text>
+          <!-- 39 --> <circle cx="970" cy="688" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="830" y="692" class="pin-text">GPIO 48 (WS2812) :39</text>
+          <!-- 40 --> <circle cx="970" cy="716" r="4.5" class="pin-circle" data-net="ENC_R_A" fill="var(--sig-pcnt)"/>
+          <text x="770" y="720" class="pin-text">GPIO 21 (PCNT1 -> Enc R A) :40</text>
+          <!-- 41 --> <circle cx="970" cy="744" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="830" y="748" class="pin-text">GPIO 20 (USB D+) :41</text>
+          <!-- 42 --> <circle cx="970" cy="772" r="4.5" class="pin-circle" data-net="NC" fill="var(--gnd)"/>
+          <text x="830" y="776" class="pin-text">GPIO 19 (USB D-) :42</text>
+          <!-- 43 --> <circle cx="970" cy="800" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+          <text x="855" y="804" class="pin-text">GND (Ground) :43</text>
+          <!-- 44 --> <circle cx="970" cy="828" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+          <text x="855" y="832" class="pin-text">GND (Ground) :44</text>
+        </g>
+      </g>
+
+      <!-- ================= 4. QTR-8A REFLECTANCE SENSOR (RIGHT) ================= -->
+      <g id="box-qtr">
+        <rect x="1100" y="220" width="280" height="370" class="module-box"/>
+        <path d="M1100 220 h280 v24 h-280 z" class="module-header"/>
+        <text x="1115" y="236" class="header-text">POLOLU QTR-8A ARRAY</text>
+
+        <circle cx="1110" cy="265" r="4.5" class="pin-circle" data-net="3V3" fill="var(--pwr-3v3)"/>
+        <text x="1125" y="268" class="pin-text" fill="#eab308">VCC: 3.3V (NEVER 5V!)</text>
+
+        <circle cx="1110" cy="295" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="1125" y="298" class="pin-text">GND: Common Ground</text>
+
+        <circle cx="1110" cy="325" r="4.5" class="pin-circle" data-net="3V3" fill="var(--pwr-3v3)"/>
+        <text x="1125" y="328" class="pin-text">LEDON: Tied to 3.3V</text>
+
+        <!-- 8 Analog Channels -->
+        <circle cx="1110" cy="360" r="4.5" class="pin-circle" data-net="QTR_1" fill="var(--sig-adc)"/>
+        <text x="1125" y="363" class="pin-text">OUT 1 -> GPIO 1 (Right-most)</text>
+
+        <circle cx="1110" cy="390" r="4.5" class="pin-circle" data-net="QTR_2" fill="var(--sig-adc)"/>
+        <text x="1125" y="393" class="pin-text">OUT 2 -> GPIO 2</text>
+
+        <circle cx="1110" cy="420" r="4.5" class="pin-circle" data-net="QTR_3" fill="var(--sig-adc)"/>
+        <text x="1125" y="423" class="pin-text">OUT 3 -> GPIO 3</text>
+
+        <circle cx="1110" cy="450" r="4.5" class="pin-circle" data-net="QTR_4" fill="var(--sig-adc)"/>
+        <text x="1125" y="453" class="pin-text">OUT 4 -> GPIO 4</text>
+
+        <circle cx="1110" cy="480" r="4.5" class="pin-circle" data-net="QTR_5" fill="var(--sig-adc)"/>
+        <text x="1125" y="483" class="pin-text">OUT 5 -> GPIO 5</text>
+
+        <circle cx="1110" cy="510" r="4.5" class="pin-circle" data-net="QTR_6" fill="var(--sig-adc)"/>
+        <text x="1125" y="513" class="pin-text">OUT 6 -> GPIO 6</text>
+
+        <circle cx="1110" cy="540" r="4.5" class="pin-circle" data-net="QTR_7" fill="var(--sig-adc)"/>
+        <text x="1125" y="543" class="pin-text">OUT 7 -> GPIO 7</text>
+
+        <circle cx="1110" cy="570" r="4.5" class="pin-circle" data-net="QTR_8" fill="var(--sig-adc)"/>
+        <text x="1125" y="573" class="pin-text">OUT 8 -> GPIO 8 (Left-most)</text>
+      </g>
+
+      <!-- Status Indicator Block -->
+      <g id="box-led">
+        <rect x="1100" y="630" width="280" height="90" class="module-box"/>
+        <path d="M1100 630 h280 v20 h-280 z" class="module-header"/>
+        <text x="1115" y="645" class="header-text" style="font-size:11px;">ONBOARD STATUS LED (3mm)</text>
+        <circle cx="1110" cy="670" r="4.5" class="pin-circle" data-net="LED_STAT" fill="var(--sig-led)"/>
+        <circle cx="1110" cy="695" r="4.5" class="pin-circle" data-net="GND" fill="var(--gnd)"/>
+        <text x="1125" y="673" class="pin-text">Anode -> 330Ω -> GPIO 16</text>
+        <text x="1125" y="698" class="pin-text">Cathode -> Common GND</text>
+      </g>
+
+      <!-- ================= 5. DEDICATED SIGNAL WIRES ================= -->
+      <!-- Battery Raw -> Switch -->
+      <!-- ================= BUS CORRIDORS ================= -->
+      <!-- Ground Bus with Dedicated Drop Taps -->
+      <path d="M 170 120 L 170 930 L 1480 930 L 1480 300" class="wire" data-net="GND" stroke="var(--gnd)" stroke-dasharray="4,4"/>
+      <path d="M 50 305 L 17 305 L 17 930" class="wire" data-net="GND" stroke="var(--gnd)" stroke-dasharray="4,4"/> <!-- DRV GND Tap -->
+      <path d="M 530 828 L 470 828 L 470 930" class="wire" data-net="GND" stroke="var(--gnd)" stroke-dasharray="4,4"/> <!-- ESP32 GND Tap -->
+      <path d="M 1110 695 L 1110 930" class="wire" data-net="GND" stroke="var(--gnd)" stroke-dasharray="4,4"/> <!-- LED GND Tap -->
+
+      <!-- 3.3V Logic Bus with Taps to nSLEEP and Encoders -->
+      <path d="M 530 240 L 460 240 L 460 900 L 1440 900 L 1440 265 L 1110 265" class="wire" data-net="3V3" stroke="var(--pwr-3v3)"/>
+      <path d="M 50 335 L 25 335 L 25 900" class="wire" data-net="3V3" stroke="var(--pwr-3v3)"/> <!-- DRV nSLEEP Tap -->
+      <path d="M 370 675 L 430 675 L 430 900" class="wire" data-net="3V3" stroke="var(--pwr-3v3)"/> <!-- Left Enc VCC Tap -->
+      <path d="M 370 830 L 430 830 L 430 900" class="wire" data-net="3V3" stroke="var(--pwr-3v3)"/> <!-- Right Enc VCC Tap -->
+
+      <!-- ================= 5. DEDICATED SIGNAL WIRES ================= -->
+      <!-- Battery Raw -> Switch -->
+      <path d="M 170 75 L 240 75" class="wire" data-net="VBAT_RAW" stroke="var(--pwr-7v)"/>
+      <!-- Switch -> Buck IN+ & Cap & Driver VM -->
+      <path d="M 370 75 L 450 68" class="wire" data-net="VBAT_SW" stroke="var(--pwr-7v)"/>
+      <path d="M 400 75 L 400 180 L 260 180" class="wire" data-net="VBAT_SW" stroke="var(--pwr-7v)"/>
+      <path d="M 400 180 L 400 220 L 25 220 L 25 275 L 50 275" class="wire" data-net="VBAT_SW" stroke="var(--pwr-7v)"/>
+
+      <!-- Buck 5V Out -> ESP32 5V (Pin 21) -->
+      <path d="M 620 68 L 660 68 L 660 150 L 500 150 L 500 800 L 530 800" class="wire" data-net="5V" stroke="var(--pwr-5v)"/>
+
+      <!-- Motor Power Wires (DRV8833 OUT1-OUT4 to Left & Right JST Pins 1 & 2) -->
+      <path d="M 50 435 L 20 435 L 20 635 L 50 635" class="wire" data-net="MOT_L_P" stroke="var(--mot-pwr)"/>
+      <path d="M 50 465 L 28 465 L 28 655 L 50 655" class="wire" data-net="MOT_L_N" stroke="var(--mot-pwr)"/>
+      <path d="M 50 505 L 18 505 L 18 790 L 50 790" class="wire" data-net="MOT_R_P" stroke="var(--mot-pwr)"/>
+      <path d="M 50 535 L 10 535 L 10 810 L 50 810" class="wire" data-net="MOT_R_N" stroke="var(--mot-pwr)"/>
+
+      <!-- PWM Drives to DRV8833 -->
+      <path d="M 530 716 L 430 716 L 430 275 L 370 275" class="wire" data-net="M_L_IN1" stroke="var(--sig-pwm)"/>
+      <path d="M 530 744 L 420 744 L 420 305 L 370 305" class="wire" data-net="M_L_IN2" stroke="var(--sig-pwm)"/>
+      <path d="M 530 772 L 410 772 L 410 335 L 370 335" class="wire" data-net="M_R_IN3" stroke="var(--sig-pwm)"/>
+      <path d="M 530 436 L 400 436 L 400 365 L 370 365" class="wire" data-net="M_R_IN4" stroke="var(--sig-pwm)"/>
+
+      <!-- Encoders to PCNT Pins -->
+      <path d="M 370 715 L 440 715 L 440 492 L 530 492" class="wire" data-net="ENC_L_A" stroke="var(--sig-pcnt)"/>
+      <path d="M 370 735 L 450 735 L 450 520 L 530 520" class="wire" data-net="ENC_L_B" stroke="var(--sig-pcnt)"/>
+      <path d="M 370 870 L 480 870 L 480 860 L 1010 860 L 1010 716 L 970 716" class="wire" data-net="ENC_R_A" stroke="var(--sig-pcnt)"/>
+      <path d="M 370 890 L 490 890 L 490 870 L 1020 870 L 1020 492 L 970 492" class="wire" data-net="ENC_R_B" stroke="var(--sig-pcnt)"/>
+
+      <!-- QTR Analog Lines -->
+      <path d="M 970 324 L 1110 360" class="wire" data-net="QTR_1" stroke="var(--sig-adc)"/>
+      <path d="M 970 352 L 1110 390" class="wire" data-net="QTR_2" stroke="var(--sig-adc)"/>
+      <path d="M 530 576 L 500 576 L 500 170 L 1040 170 L 1040 420 L 1110 420" class="wire" data-net="QTR_3" stroke="var(--sig-adc)"/>
+      <path d="M 530 324 L 490 324 L 490 160 L 1050 160 L 1050 450 L 1110 450" class="wire" data-net="QTR_4" stroke="var(--sig-adc)"/>
+      <path d="M 530 352 L 480 352 L 480 150 L 1060 150 L 1060 480 L 1110 480" class="wire" data-net="QTR_5" stroke="var(--sig-adc)"/>
+      <path d="M 530 380 L 470 380 L 470 140 L 1070 140 L 1070 510 L 1110 510" class="wire" data-net="QTR_6" stroke="var(--sig-adc)"/>
+      <path d="M 530 408 L 460 408 L 460 130 L 1080 130 L 1080 540 L 1110 540" class="wire" data-net="QTR_7" stroke="var(--sig-adc)"/>
+      <path d="M 530 548 L 510 548 L 510 180 L 1030 180 L 1030 570 L 1110 570" class="wire" data-net="QTR_8" stroke="var(--sig-adc)"/>
+
+      <!-- Status LED: Routed completely UNDER the ESP32 instead of piercing through it -->
+      <path d="M 530 464 L 480 464 L 480 880 L 1050 880 L 1050 670 L 1110 670" class="wire" data-net="LED_STAT" stroke="var(--sig-led)"/>
+    </svg>
+  </div>
+
+  <div class="sidebar">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('pins')">All 44 ESP32 Pins</button>
+      <button class="tab-btn" onclick="showTab('nets')">Netlist Cheat Sheet</button>
+      <button class="tab-btn" onclick="showTab('rules')">Electrical Rules</button>
+    </div>
+
+    <div id="tab-pins" class="tab-content">
+      <input type="text" id="pinSearch" class="search-box" placeholder="Search pin, GPIO, or net..." onkeyup="filterPins()"/>
+      <table id="pinTable">
+        <thead>
+          <tr>
+            <th>Pin</th>
+            <th>GPIO / Spec</th>
+            <th>Net Name</th>
+            <th>Target Device & Pin</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr data-net="3V3"><td>Pin 1</td><td>3.3V Out (500mA)</td><td><span class="net-tag" style="background:#eab308; color:#000;">3V3</span></td><td>QTR VCC, DRV nSLEEP, Encoders</td></tr>
+          <tr data-net="3V3"><td>Pin 2</td><td>3.3V (Aux Rail)</td><td><span class="net-tag" style="background:#eab308; color:#000;">3V3</span></td><td>Aux Logic Filter</td></tr>
+          <tr data-net="NC"><td>Pin 3</td><td>EN (Reset)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Onboard Reset Button</td></tr>
+          <tr data-net="QTR_4"><td>Pin 4</td><td>GPIO 4 (ADC1_3)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_4</span></td><td>QTR-8A Sensor 4</td></tr>
+          <tr data-net="QTR_5"><td>Pin 5</td><td>GPIO 5 (ADC1_4)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_5</span></td><td>QTR-8A Sensor 5</td></tr>
+          <tr data-net="QTR_6"><td>Pin 6</td><td>GPIO 6 (ADC1_5)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_6</span></td><td>QTR-8A Sensor 6</td></tr>
+          <tr data-net="QTR_7"><td>Pin 7</td><td>GPIO 7 (ADC1_6)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_7</span></td><td>QTR-8A Sensor 7</td></tr>
+          <tr data-net="M_R_IN4"><td>Pin 8</td><td>GPIO 15 (PWM)</td><td><span class="net-tag" style="background:#c084fc; color:#000;">M_R_IN4</span></td><td>DRV8833 IN4 (Right Reverse)</td></tr>
+          <tr data-net="LED_STAT"><td>Pin 9</td><td>GPIO 16 (Output)</td><td><span class="net-tag" style="background:#f43f5e; color:#fff;">LED_STAT</span></td><td>Status LED (330Ω)</td></tr>
+          <tr data-net="ENC_L_A"><td>Pin 10</td><td>GPIO 17 (PCNT0_0)</td><td><span class="net-tag" style="background:#06b6d4; color:#000;">ENC_L_A</span></td><td>Left Motor Enc A</td></tr>
+          <tr data-net="ENC_L_B"><td>Pin 11</td><td>GPIO 18 (PCNT0_1)</td><td><span class="net-tag" style="background:#06b6d4; color:#000;">ENC_L_B</span></td><td>Left Motor Enc B</td></tr>
+          <tr data-net="QTR_8"><td>Pin 12</td><td>GPIO 8 (ADC1_7)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_8</span></td><td>QTR-8A Sensor 8 (Left Edge)</td></tr>
+          <tr data-net="QTR_3"><td>Pin 13</td><td>GPIO 3 (ADC1_2)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_3</span></td><td>QTR-8A Sensor 3</td></tr>
+          <tr data-net="NC"><td>Pin 14</td><td>GPIO 46 (Strap)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Boot Rom Log Pin</td></tr>
+          <tr data-net="NC"><td>Pin 15</td><td>GPIO 9</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO / User Button</td></tr>
+          <tr data-net="NC"><td>Pin 16</td><td>GPIO 10</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO / Buzzer</td></tr>
+          <tr data-net="NC"><td>Pin 17</td><td>GPIO 11</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO</td></tr>
+          <tr data-net="M_L_IN1"><td>Pin 18</td><td>GPIO 12 (PWM)</td><td><span class="net-tag" style="background:#c084fc; color:#000;">M_L_IN1</span></td><td>DRV8833 IN1 (Left Forward)</td></tr>
+          <tr data-net="M_L_IN2"><td>Pin 19</td><td>GPIO 13 (PWM)</td><td><span class="net-tag" style="background:#c084fc; color:#000;">M_L_IN2</span></td><td>DRV8833 IN2 (Left Reverse)</td></tr>
+          <tr data-net="M_R_IN3"><td>Pin 20</td><td>GPIO 14 (PWM)</td><td><span class="net-tag" style="background:#c084fc; color:#000;">M_R_IN3</span></td><td>DRV8833 IN3 (Right Forward)</td></tr>
+          <tr data-net="5V"><td>Pin 21</td><td>5V In</td><td><span class="net-tag" style="background:#f97316; color:#000;">5V</span></td><td>MP1584 Buck OUT+</td></tr>
+          <tr data-net="GND"><td>Pin 22</td><td>GND</td><td><span class="net-tag" style="background:#64748b; color:#fff;">GND</span></td><td>Common Ground Plane</td></tr>
+
+          <!-- Right Header -->
+          <tr data-net="GND"><td>Pin 23</td><td>GND</td><td><span class="net-tag" style="background:#64748b; color:#fff;">GND</span></td><td>Common Ground Plane</td></tr>
+          <tr data-net="NC"><td>Pin 24</td><td>GPIO 43 (U0TXD)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>UART Console TX</td></tr>
+          <tr data-net="NC"><td>Pin 25</td><td>GPIO 44 (U0RXD)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>UART Console RX</td></tr>
+          <tr data-net="QTR_1"><td>Pin 26</td><td>GPIO 1 (ADC1_0)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_1</span></td><td>QTR-8A Sensor 1 (Right Edge)</td></tr>
+          <tr data-net="QTR_2"><td>Pin 27</td><td>GPIO 2 (ADC1_1)</td><td><span class="net-tag" style="background:#10b981; color:#000;">QTR_2</span></td><td>QTR-8A Sensor 2</td></tr>
+          <tr data-net="NC"><td>Pin 28</td><td>GPIO 42 (MTMS)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>JTAG Debug Pin</td></tr>
+          <tr data-net="NC"><td>Pin 29</td><td>GPIO 41 (MTDI)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>JTAG Debug Pin</td></tr>
+          <tr data-net="NC"><td>Pin 30</td><td>GPIO 40 (MTDO)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>JTAG Debug Pin</td></tr>
+          <tr data-net="NC"><td>Pin 31</td><td>GPIO 39 (MTCK)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>JTAG Debug Pin</td></tr>
+          <tr data-net="ENC_R_B"><td>Pin 32</td><td>GPIO 38 (PCNT1_1)</td><td><span class="net-tag" style="background:#06b6d4; color:#000;">ENC_R_B</span></td><td>Right Motor Enc B</td></tr>
+          <tr data-net="NC"><td>Pin 33</td><td>GPIO 37</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO</td></tr>
+          <tr data-net="NC"><td>Pin 34</td><td>GPIO 36</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO</td></tr>
+          <tr data-net="NC"><td>Pin 35</td><td>GPIO 35</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO</td></tr>
+          <tr data-net="NC"><td>Pin 36</td><td>GPIO 0 (BOOT)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Boot Mode Switch</td></tr>
+          <tr data-net="NC"><td>Pin 37</td><td>GPIO 45</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO</td></tr>
+          <tr data-net="NC"><td>Pin 38</td><td>GPIO 47</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Spare GPIO</td></tr>
+          <tr data-net="NC"><td>Pin 39</td><td>GPIO 48 (RGB)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Onboard RGB LED</td></tr>
+          <tr data-net="ENC_R_A"><td>Pin 40</td><td>GPIO 21 (PCNT1_0)</td><td><span class="net-tag" style="background:#06b6d4; color:#000;">ENC_R_A</span></td><td>Right Motor Enc A</td></tr>
+          <tr data-net="NC"><td>Pin 41</td><td>GPIO 20 (USB D+)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Native USB Header</td></tr>
+          <tr data-net="NC"><td>Pin 42</td><td>GPIO 19 (USB D-)</td><td><span class="net-tag" style="background:#64748b; color:#fff;">NC</span></td><td>Native USB Header</td></tr>
+          <tr data-net="GND"><td>Pin 43</td><td>GND</td><td><span class="net-tag" style="background:#64748b; color:#fff;">GND</span></td><td>Common Ground</td></tr>
+          <tr data-net="GND"><td>Pin 44</td><td>GND</td><td><span class="net-tag" style="background:#64748b; color:#fff;">GND</span></td><td>Common Ground</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="tab-nets" class="tab-content" style="display:none;">
+      <div style="background:#0b1120; padding:12px; border-radius:6px; font-family:monospace; font-size:0.75rem; line-height:1.7; border:1px solid var(--border);">
+        <strong style="color:var(--pwr-7v);">POWER RAILS:</strong><br>
+        VBAT_RAW : LiPo (+) to Switch Pin 1<br>
+        VBAT_SW  : Switch Output -> MP1584 IN+ & DRV8833 VM<br>
+        5V       : Buck OUT+ -> ESP32 Pin 21 (5V)<br>
+        3V3      : ESP32 Pin 1 -> QTR VCC, DRV nSLEEP, Encoders<br>
+        GND      : All module grounds<br><br>
+        <strong style="color:var(--mot-pwr);">MOTOR DRIVE OUTPUTS:</strong><br>
+        MOT_L_P  : DRV8833 OUT1 -> Left Motor JST Pin 1<br>
+        MOT_L_N  : DRV8833 OUT2 -> Left Motor JST Pin 2<br>
+        MOT_R_P  : DRV8833 OUT3 -> Right Motor JST Pin 1<br>
+        MOT_R_N  : DRV8833 OUT4 -> Right Motor JST Pin 2<br><br>
+        <strong style="color:var(--sig-pwm);">DRV8833 PWM INPUTS:</strong><br>
+        M_L_IN1  : ESP32 GPIO 12 -> DRV8833 IN1<br>
+        M_L_IN2  : ESP32 GPIO 13 -> DRV8833 IN2<br>
+        M_R_IN3  : ESP32 GPIO 14 -> DRV8833 IN3<br>
+        M_R_IN4  : ESP32 GPIO 15 -> DRV8833 IN4<br><br>
+        <strong style="color:var(--sig-pcnt);">ENCODER PCNT:</strong><br>
+        ENC_L_A  : Left Enc Pin 5 -> GPIO 17<br>
+        ENC_L_B  : Left Enc Pin 6 -> GPIO 18<br>
+        ENC_R_A  : Right Enc Pin 5 -> GPIO 21<br>
+        ENC_R_B  : Right Enc Pin 6 -> GPIO 38<br><br>
+        <strong style="color:var(--sig-adc);">QTR-8A SENSORS:</strong><br>
+        QTR_1 to QTR_8 -> Sensors 1 to 8 -> GPIO 1, 2, 3, 4, 5, 6, 7, 8
+      </div>
+    </div>
+
+    <div id="tab-rules" class="tab-content" style="display:none;">
+      <div style="background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:6px; padding:12px; font-size:0.75rem; line-height:1.4;">
+        <strong style="color:#fca5a5;">SAFETY RULE: NEVER FEED 5V TO QTR-8A</strong><br>
+        Powering QTR-8A with 5V outputs 0–5V signals into ESP32 ADC pins, causing permanent pin gate breakdown. 3.3V keeps sensor outputs strictly within the safe 0–3.3V range.
+      </div>
+      <div style="background:rgba(56,189,248,0.08); border:1px solid #0284c7; border-radius:6px; padding:12px; font-size:0.75rem; line-height:1.4; margin-top:8px;">
+        <strong style="color:#38bdf8;">BUCK CONVERTER TUNING:</strong><br>
+        Do NOT connect the ESP32 to the MP1584 until you attach the 2S battery and turn the potentiometer screw with a multimeter until it reads exactly <strong>5.00V DC</strong>.
+      </div>
+      <div style="background:rgba(234,179,8,0.08); border:1px solid #eab308; border-radius:6px; padding:12px; font-size:0.75rem; line-height:1.4; margin-top:8px;">
+        <strong style="color:#eab308;">COPPER TRACE WIDTHS:</strong><br>
+        * Motor Rails (VBAT_RAW, VBAT_SW, VM, MOT_x): <strong>1.2mm - 1.5mm</strong><br>
+        * Digital/ADC/PWM: <strong>0.254mm (10 mil)</strong><br>
+        * Solder the 100uF capacitor as close as possible to DRV8833 VM & GND pins.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentZoom = 1;
+  const svg = document.getElementById('schematicSvg');
+  const activePill = document.getElementById('activePill');
+  const activeNetName = document.getElementById('activeNetName');
+
+  function zoom(delta) {
+    currentZoom = Math.min(Math.max(0.6, currentZoom + delta), 2.0);
+    svg.style.transform = `scale(${currentZoom})`;
+    svg.style.transformOrigin = 'top left';
+  }
+
+  function resetZoom() {
+    currentZoom = 1;
+    svg.style.transform = 'scale(1)';
+  }
+
+  function showTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-' + tabId).style.display = 'flex';
+    event.currentTarget.classList.add('active');
+  }
+
+  function setHighlight(net) {
+    if (!net || net === 'NC') return;
+    svg.classList.add('highlight-active');
+    activePill.style.display = 'block';
+    activeNetName.innerText = net;
+
+    document.querySelectorAll('.selected-net').forEach(el => el.classList.remove('selected-net'));
+    document.querySelectorAll(`[data-net="${net}"]`).forEach(el => {
+      el.classList.add('selected-net');
+    });
+  }
+
+  function clearHighlight() {
+    svg.classList.remove('highlight-active');
+    document.querySelectorAll('.selected-net').forEach(el => el.classList.remove('selected-net'));
+    activePill.style.display = 'none';
+  }
+
+  document.querySelectorAll('.pin-circle').forEach(pin => {
+    pin.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setHighlight(pin.getAttribute('data-net'));
+    });
+  });
+
+  document.querySelectorAll('#pinTable tbody tr').forEach(row => {
+    row.addEventListener('click', () => {
+      setHighlight(row.getAttribute('data-net'));
+    });
+  });
+
+  svg.addEventListener('click', (e) => {
+    if (e.target.tagName === 'svg' || e.target.classList.contains('viewport')) {
+      clearHighlight();
+    }
+  });
+
+  function filterPins() {
+    const q = document.getElementById('pinSearch').value.toLowerCase();
+    document.querySelectorAll('#pinTable tbody tr').forEach(r => {
+      r.style.display = r.innerText.toLowerCase().includes(q) ? '' : 'none';
+    });
+  }
+</script>
+</body>
+</html>
